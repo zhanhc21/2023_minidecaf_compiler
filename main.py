@@ -33,7 +33,6 @@ def readCode(fileName):
 def step_parse(args: argparse.Namespace):
     code = readCode(args.input)
     r: Program = parser.parse(code, lexer=lexer)
-
     errors = parser.error_stack
     if errors:
         print("\n".join(map(str, errors)), file=sys.stderr)
