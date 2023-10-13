@@ -20,6 +20,8 @@ class InstrKind(Enum):
 @unique
 class TacUnaryOp(Enum):
     NEG = auto()
+    BITNOT = auto()
+    LOGICNOT = auto()
 
 # Kinds of binary operations.
 @unique

@@ -88,11 +88,12 @@ class Unary(TACInstr):
         self.op = op
         self.dst = dst
         self.operand = operand
-
+    
+    # TODO
     def __str__(self) -> str:
         return "%s = %s %s" % (
             self.dst,
-            ("-" if (self.op == TacUnaryOp.NEG) else "!"),
+            ("-" if (self.op == TacUnaryOp.NEG) else ("~" if (self.op == TacUnaryOp.BITNOT) else "!")),
             self.operand,
         )
 
