@@ -17,14 +17,21 @@ MAX_INT: Final[int] = 0x7FFF_FFFF
 @unique
 class RvUnaryOp(Enum):
     NEG = auto()
-    # TODO
-    BITNOT = auto()
-    LOGICNOT = auto()
+    NOT = auto()
+    SEQZ = auto()
     SNEZ = auto()
+    SGTZ = auto()
 
 @unique
 class RvBinaryOp(Enum):
     ADD = auto()
+    SUB = auto()
+    MUL = auto()
+    DIV = auto()
+    REM = auto()
+
+    SLT = auto()
+    AND = auto()
     OR = auto()
 
 class Riscv:
