@@ -219,7 +219,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
     def visitUnary(self, expr: Unary, mv: TACFuncEmitter) -> None:
         expr.operand.accept(self, mv)
-
+        
         op = {
             node.UnaryOp.Neg: tacop.TacUnaryOp.NEG,
             node.UnaryOp.BitNot: tacop.TacUnaryOp.BITNOT,
