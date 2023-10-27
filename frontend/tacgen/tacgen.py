@@ -14,11 +14,9 @@ from utils.tac.tacfunc import TACFunc
 from utils.tac.tacprog import TACProg
 from utils.tac.tacvisitor import TACVisitor
 
-
 """
 The TAC generation phase: translate the abstract syntax tree into three-address code.
 """
-
 
 class LabelManager:
     """
@@ -136,6 +134,7 @@ class TACFuncEmitter(TACVisitor):
 
 class TACGen(Visitor[TACFuncEmitter, None]):
     # Entry of this phase
+
     def transform(self, program: Program) -> TACProg:
         labelManager = LabelManager()
         tacFuncs = []
@@ -157,19 +156,17 @@ class TACGen(Visitor[TACFuncEmitter, None]):
     def visitBreak(self, stmt: Break, mv: TACFuncEmitter) -> None:
         mv.visitBranch(mv.getBreakLabel())
 
-    def visitIdentifier(self, ident: Identifier, mv: TACFuncEmitter) -> None:
-        """
-        1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
-        """
-        raise NotImplementedError
-
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
         """
         1. Get the 'symbol' attribute of decl.
         2. Use mv.freshTemp to get a new temp variable for this symbol.
         3. If the declaration has an initial value, use mv.visitAssignment to set it.
         """
-        raise NotImplementedError
+        var = decl.getattr("symbol")
+        var.temp = mv.freshTemp()
+        if decl.init_expr != NULL:
+            decl.init_expr.accept(self, mv)
+            mv.visitAssignment(var.temp, decl.init_expr.getattr("val"))
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
         """
@@ -177,8 +174,19 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.visitAssignment to emit an assignment instruction.
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
-        raise NotImplementedError
-
+        expr.rhs.accept(self, mv)
+        r_temp = expr.rhs.getattr("val")
+        l_temp = expr.lhs.getattr("symbol").temp
+        mv.visitAssignment(l_temp, r_temp)
+        expr.setattr("val", r_temp)
+        
+    def visitIdentifier(self, ident: Identifier, mv: TACFuncEmitter) -> None:
+        """
+        1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
+        """
+        var = ident.getattr("symbol")
+        ident.setattr("val", var.temp)
+    
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)
 
@@ -247,6 +255,11 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
             node.BinaryOp.LogicOr: tacop.TacBinaryOp.LOR,
             node.BinaryOp.LogicAnd: tacop.TacBinaryOp.LAND,
+
+            # assignment
+            node.BinaryOp.Assign: tacop.TacBinaryOp.ASSIGN,
+
+
         }[expr.op]
         expr.setattr(
             "val", mv.visitBinary(op, expr.lhs.getattr("val"), expr.rhs.getattr("val"))

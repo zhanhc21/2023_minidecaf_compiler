@@ -20,3 +20,5 @@ class VarSymbol(Symbol):
     # To set the initial value of a variable symbol (used for global variable).
     def setInitValue(self, value: int) -> None:
         self.initValue = value
+
+    

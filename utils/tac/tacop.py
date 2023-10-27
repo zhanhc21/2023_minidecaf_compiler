@@ -42,6 +42,8 @@ class TacBinaryOp(Enum):
     LOR = auto()
     LAND = auto()
 
+    ASSIGN = auto()
+
 # Kinds of branching with conditions.
 @unique
 class CondBranchOp(Enum):

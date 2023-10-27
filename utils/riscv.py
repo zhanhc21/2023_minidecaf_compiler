@@ -34,6 +34,7 @@ class RvBinaryOp(Enum):
     AND = auto()
     OR = auto()
 
+    MV = auto()
 class Riscv:
 
     ZERO = Reg(0, "x0")  # always zero
