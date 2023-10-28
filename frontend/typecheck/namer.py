@@ -100,7 +100,9 @@ class Namer(Visitor[Scope, None]):
             ctx.declare(var)
             decl.setattr("symbol", var)
             if decl.init_expr != NULL:
-                decl.init_expr.accept(self, ctx)           
+                decl.init_expr.accept(self, ctx)
+        else:
+            raise DecafDeclConflictError(str(decl.ident.value)) 
 
     def visitAssignment(self, expr: Assignment, ctx: Scope) -> None:
         """
@@ -129,7 +131,7 @@ class Namer(Visitor[Scope, None]):
         3. Set the 'symbol' attribute of ident.
         """
         if ctx.lookup(ident.value) == None:
-            raise DecafUndefinedVarError
+            raise DecafUndefinedVarError(str(ident.value))
         ident.setattr("symbol", ctx.get(ident.value))
 
     def visitIntLiteral(self, expr: IntLiteral, ctx: Scope) -> None:
