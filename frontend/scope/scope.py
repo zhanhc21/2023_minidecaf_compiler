@@ -44,3 +44,6 @@ class Scope:
         if self.containsKey(name):
             return self.get(name)
         return None
+
+    def printAll(self) -> None:
+        print(self.symbols)
