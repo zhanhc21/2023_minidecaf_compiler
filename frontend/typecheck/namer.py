@@ -50,19 +50,8 @@ class Namer(Visitor[ScopeStack, None]):
         # 出栈
         ctx.pop()    
 
-
     def visitReturn(self, stmt: Return, ctx: ScopeStack) -> None:
         stmt.expr.accept(self, ctx)
-
-    """
-    def visitFor(self, stmt: For, ctx: Scope) -> None:
-
-    1. Open a local scope for stmt.init.
-    2. Visit stmt.init, stmt.cond, stmt.update.
-    3. Open a loop in ctx (for validity checking of break/continue)
-    4. Visit body of the loop.
-    5. Close the loop and the local scope.
-    """
 
     def visitIf(self, stmt: If, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
@@ -74,23 +63,29 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitWhile(self, stmt: While, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
+        ctx.openloop()
         stmt.body.accept(self, ctx)
+        ctx.closeloop()
+
+    def visitFor(self, stmt: For, ctx: ScopeStack) -> None:
+        ctx.push(Scope(ScopeKind.LOCAL))
+        
+        stmt.init.accept(self, ctx)
+        stmt.cond.accept(self, ctx)
+        stmt.update.accept(self, ctx)
+
+        ctx.openloop()
+        stmt.body.accept(self, ctx)
+        ctx.closeloop()
+        ctx.pop()
 
     def visitBreak(self, stmt: Break, ctx: ScopeStack) -> None:
-        """
-        You need to check if it is currently within the loop.
-        To do this, you may need to check 'visitWhile'.
-
-        if not in a loop:
+        if ctx.checkLoop() == 0:
             raise DecafBreakOutsideLoopError()
-        """
-        raise NotImplementedError
-
-    """
-    def visitContinue(self, stmt: Continue, ctx: Scope) -> None:
     
-    1. Refer to the implementation of visitBreak.
-    """
+    def visitContinue(self, stmt: Continue, ctx: Scope) -> None:
+        if ctx.checkLoop() == 0:
+            raise DecafBreakOutsideLoopError()
 
     def visitDeclaration(self, decl: Declaration, ctx: ScopeStack) -> None:
         """
@@ -109,9 +104,6 @@ class Namer(Visitor[ScopeStack, None]):
             raise DecafDeclConflictError(str(decl.ident.value)) 
 
     def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
-        """
-        1. Refer to the implementation of visitBinary.
-        """
         expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
 
@@ -123,17 +115,11 @@ class Namer(Visitor[ScopeStack, None]):
         expr.rhs.accept(self, ctx)
 
     def visitCondExpr(self, expr: ConditionExpression, ctx: ScopeStack) -> None:
-        """
-        1. Refer to the implementation of visitBinary.
-        """
-        raise NotImplementedError
+        expr.cond.accept(self, ctx)
+        expr.then.accept(self, ctx)
+        expr.otherwise.accept(self, ctx)
 
     def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
-        """
-        1. Use ctx.lookup to find the symbol corresponding to ident.
-        2. If it has not been declared, raise a DecafUndefinedVarError.
-        3. Set the 'symbol' attribute of ident.
-        """
         if ctx.lookup(ident.value) == None:
             raise DecafUndefinedVarError(str(ident.value))
         ident.setattr("symbol", ctx.lookup(ident.value))

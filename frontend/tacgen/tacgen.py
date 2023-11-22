@@ -156,12 +156,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
     def visitBreak(self, stmt: Break, mv: TACFuncEmitter) -> None:
         mv.visitBranch(mv.getBreakLabel())
 
+    def visitContinue(self, stmt: Continue, mv: TACFuncEmitter) -> None:
+        mv.visitBranch(mv.getContinueLabel())
+
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
-        """
-        1. Get the 'symbol' attribute of decl.
-        2. Use mv.freshTemp to get a new temp variable for this symbol.
-        3. If the declaration has an initial value, use mv.visitAssignment to set it.
-        """
         var = decl.getattr("symbol")
         var.temp = mv.freshTemp()
         if decl.init_expr != NULL:
@@ -169,11 +167,6 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             mv.visitAssignment(var.temp, decl.init_expr.getattr("val"))
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
-        """
-        1. Visit the right hand side of expr, and get the temp variable of left hand side.
-        2. Use mv.visitAssignment to emit an assignment instruction.
-        3. Set the 'val' attribute of expr as the value of assignment instruction.
-        """
         expr.rhs.accept(self, mv)
         r_temp = expr.rhs.getattr("val")
         l_temp = expr.lhs.getattr("symbol").temp
@@ -181,9 +174,6 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         expr.setattr("val", r_temp)
         
     def visitIdentifier(self, ident: Identifier, mv: TACFuncEmitter) -> None:
-        """
-        1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
-        """
         var = ident.getattr("symbol")
         ident.setattr("val", var.temp)
     
@@ -225,6 +215,27 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         mv.visitLabel(breakLabel)
         mv.closeLoop()
 
+    def visitFor(self, stmt: For, mv: TACFuncEmitter) -> None:
+        beginLabel = mv.freshLabel()
+        loopLabel = mv.freshLabel()
+        breakLabel = mv.freshLabel()
+
+        # ini i
+        stmt.init.accept(self, mv)
+        mv.openLoop(breakLabel, loopLabel)
+
+        mv.visitLabel(beginLabel)
+        stmt.cond.accept(self, mv)
+        mv.visitCondBranch(tacop.CondBranchOp.BEQ, stmt.cond.getattr("val"), breakLabel)
+
+        stmt.body.accept(self, mv)
+        mv.visitLabel(loopLabel)
+        stmt.update.accept(self, mv)
+
+        mv.visitBranch(beginLabel)
+        mv.visitLabel(breakLabel)
+        mv.closeLoop()
+
     def visitUnary(self, expr: Unary, mv: TACFuncEmitter) -> None:
         expr.operand.accept(self, mv)
         
@@ -258,18 +269,33 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
             # assignment
             node.BinaryOp.Assign: tacop.TacBinaryOp.ASSIGN,
-
-
         }[expr.op]
         expr.setattr(
             "val", mv.visitBinary(op, expr.lhs.getattr("val"), expr.rhs.getattr("val"))
         )
 
     def visitCondExpr(self, expr: ConditionExpression, mv: TACFuncEmitter) -> None:
-        """
-        1. Refer to the implementation of visitIf and visitBinary.
-        """
-        raise NotImplementedError
+        expr.cond.accept(self, mv)
+
+        # 分配临时变量
+        temp = mv.freshTemp()
+        skipLabel = mv.freshLabel()
+        exitLabel = mv.freshLabel()
+
+        mv.visitCondBranch (
+            tacop.CondBranchOp.BEQ, expr.cond.getattr("val"), skipLabel
+        )
+        # L1
+        expr.then.accept(self, mv)
+        mv.visitAssignment(temp, expr.then.getattr("val"))
+        mv.visitBranch(exitLabel)
+        # L2
+        mv.visitLabel(skipLabel)
+        expr.otherwise.accept(self, mv)
+        mv.visitAssignment(temp, expr.otherwise.getattr("val"))
+        mv.visitLabel(exitLabel)
+
+        expr.setattr("val", temp)
 
     def visitIntLiteral(self, expr: IntLiteral, mv: TACFuncEmitter) -> None:
         expr.setattr("val", mv.visitLoad(expr.value))

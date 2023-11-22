@@ -7,6 +7,7 @@ from .scope import Scope
 class ScopeStack:
     def __init__(self) -> None:
         self.scopes = []
+        self.loopNum = 0
 
     def push(self, scope: Scope) -> None:
         self.scopes.append(scope)
@@ -22,3 +23,12 @@ class ScopeStack:
             if scope.containsKey(name):
                 return scope.get(name)
         return None
+
+    def openloop(self) -> None:
+        self.loopNum += 1
+    
+    def closeloop(self) -> None:
+        self.loopNum -= 1
+
+    def checkLoop(self) -> int:
+        return self.loopNum

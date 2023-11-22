@@ -156,7 +156,6 @@ class While(Statement):
     """
     AST node of while statement.
     """
-
     def __init__(self, cond: Expression, body: Statement) -> None:
         super().__init__("while")
         self.cond = cond
@@ -176,7 +175,6 @@ class Break(Statement):
     """
     AST node of break statement.
     """
-
     def __init__(self) -> None:
         super().__init__("break")
 
@@ -188,6 +186,47 @@ class Break(Statement):
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitBreak(self, ctx)
+
+    def is_leaf(self):
+        return True
+
+
+class For(Statement):
+    """
+    AST node of For statement.
+    """
+    def __init__(self, init: Expression, cond: Expression, update: Expression, body: Statement) -> None:
+        super().__init__("for")
+        self.init = init
+        self.cond = cond
+        self.update = update
+        self.body = body
+
+    def __getitem__(self, key: int) -> Node:
+        return (self.cond, self.body)[key]
+
+    def __len__(self) -> int:
+        return 2
+
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitFor(self, ctx)
+
+
+class Continue(Statement):
+    """
+    AST node of Continue statement.
+    """
+    def __init__(self) -> None:
+        super.__init__("continue")
+    
+    def __getitem__(self, key: int) -> Node:
+        raise _index_len_err(key, self)
+
+    def __len__(self) -> int:
+        return 0
+
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitContinue(self, ctx)
 
     def is_leaf(self):
         return True
