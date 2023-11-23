@@ -171,26 +171,6 @@ class While(Statement):
         return v.visitWhile(self, ctx)
 
 
-class Break(Statement):
-    """
-    AST node of break statement.
-    """
-    def __init__(self) -> None:
-        super().__init__("break")
-
-    def __getitem__(self, key: int) -> Node:
-        raise _index_len_err(key, self)
-
-    def __len__(self) -> int:
-        return 0
-
-    def accept(self, v: Visitor[T, U], ctx: T):
-        return v.visitBreak(self, ctx)
-
-    def is_leaf(self):
-        return True
-
-
 class For(Statement):
     """
     AST node of For statement.
@@ -212,12 +192,32 @@ class For(Statement):
         return v.visitFor(self, ctx)
 
 
+class Break(Statement):
+    """
+    AST node of break statement.
+    """
+    def __init__(self) -> None:
+        super().__init__("break")
+
+    def __getitem__(self, key: int) -> Node:
+        raise _index_len_err(key, self)
+
+    def __len__(self) -> int:
+        return 0
+
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitBreak(self, ctx)
+
+    def is_leaf(self):
+        return True
+
+
 class Continue(Statement):
     """
     AST node of Continue statement.
     """
     def __init__(self) -> None:
-        super.__init__("continue")
+        super().__init__("continue")
     
     def __getitem__(self, key: int) -> Node:
         raise _index_len_err(key, self)

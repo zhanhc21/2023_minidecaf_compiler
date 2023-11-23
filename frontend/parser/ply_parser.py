@@ -114,19 +114,17 @@ def p_while(p):
     """
     p[0] = While(p[3], p[5])
 
-def p_for_init(p):
-    """
-    for_init_elem : opt_expression
-    for_init_elem : declaration
-    """
-    p[0] = p[1]
 
 def p_for(p):
+    # for (int i = 0; i < 1; i = i + 1)
     """
-    statement_matched : For LParen for_init_elem Semi opt_expression Semi opt_expression RParen statement_matched
-    statement_unmatched : For LParen for_init_elem Semi opt_expression Semi opt_expression RParen statement_unmatched
+    statement_matched : For LParen declaration Semi expression Semi expression RParen statement_matched
+    statement_matched : For LParen expression Semi expression Semi expression RParen statement_matched
+    statement_unmatched : For LParen declaration Semi expression Semi expression RParen statement_unmatched
+    statement_unmatched : For LParen expression Semi expression Semi expression RParen statement_unmatched
     """
     p[0] = For(p[3], p[5], p[7], p[9])
+
 
 def p_return(p):
     """

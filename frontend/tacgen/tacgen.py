@@ -195,9 +195,33 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             )
             stmt.then.accept(self, mv)
             mv.visitBranch(exitLabel)
+
             mv.visitLabel(skipLabel)
             stmt.otherwise.accept(self, mv)
             mv.visitLabel(exitLabel)
+
+    def visitCondExpr(self, expr: ConditionExpression, mv: TACFuncEmitter) -> None:
+        expr.cond.accept(self, mv)
+
+        # 分配临时变量
+        temp = mv.freshTemp()
+        skipLabel = mv.freshLabel()
+        exitLabel = mv.freshLabel()
+
+        mv.visitCondBranch (
+            tacop.CondBranchOp.BEQ, expr.cond.getattr("val"), skipLabel
+        )
+        # L1
+        expr.then.accept(self, mv)
+        mv.visitAssignment(temp, expr.then.getattr("val"))
+        mv.visitBranch(exitLabel)
+        # L2
+        mv.visitLabel(skipLabel)
+        expr.otherwise.accept(self, mv)
+        mv.visitAssignment(temp, expr.otherwise.getattr("val"))
+        mv.visitLabel(exitLabel)
+
+        expr.setattr("val", temp)
 
     def visitWhile(self, stmt: While, mv: TACFuncEmitter) -> None:
         beginLabel = mv.freshLabel()
@@ -219,11 +243,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         beginLabel = mv.freshLabel()
         loopLabel = mv.freshLabel()
         breakLabel = mv.freshLabel()
-
+        mv.openLoop(breakLabel, loopLabel)
         # ini i
         stmt.init.accept(self, mv)
-        mv.openLoop(breakLabel, loopLabel)
-
+        
         mv.visitLabel(beginLabel)
         stmt.cond.accept(self, mv)
         mv.visitCondBranch(tacop.CondBranchOp.BEQ, stmt.cond.getattr("val"), breakLabel)
@@ -273,29 +296,6 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         expr.setattr(
             "val", mv.visitBinary(op, expr.lhs.getattr("val"), expr.rhs.getattr("val"))
         )
-
-    def visitCondExpr(self, expr: ConditionExpression, mv: TACFuncEmitter) -> None:
-        expr.cond.accept(self, mv)
-
-        # 分配临时变量
-        temp = mv.freshTemp()
-        skipLabel = mv.freshLabel()
-        exitLabel = mv.freshLabel()
-
-        mv.visitCondBranch (
-            tacop.CondBranchOp.BEQ, expr.cond.getattr("val"), skipLabel
-        )
-        # L1
-        expr.then.accept(self, mv)
-        mv.visitAssignment(temp, expr.then.getattr("val"))
-        mv.visitBranch(exitLabel)
-        # L2
-        mv.visitLabel(skipLabel)
-        expr.otherwise.accept(self, mv)
-        mv.visitAssignment(temp, expr.otherwise.getattr("val"))
-        mv.visitLabel(exitLabel)
-
-        expr.setattr("val", temp)
 
     def visitIntLiteral(self, expr: IntLiteral, mv: TACFuncEmitter) -> None:
         expr.setattr("val", mv.visitLoad(expr.value))

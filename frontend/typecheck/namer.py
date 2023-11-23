@@ -61,8 +61,14 @@ class Namer(Visitor[ScopeStack, None]):
         if not stmt.otherwise is NULL:
             stmt.otherwise.accept(self, ctx)
 
+    def visitCondExpr(self, expr: ConditionExpression, ctx: ScopeStack) -> None:
+        expr.cond.accept(self, ctx)
+        expr.then.accept(self, ctx)
+        expr.otherwise.accept(self, ctx)
+
     def visitWhile(self, stmt: While, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
+        
         ctx.openloop()
         stmt.body.accept(self, ctx)
         ctx.closeloop()
@@ -88,12 +94,6 @@ class Namer(Visitor[ScopeStack, None]):
             raise DecafBreakOutsideLoopError()
 
     def visitDeclaration(self, decl: Declaration, ctx: ScopeStack) -> None:
-        """
-        1. Use ctx.lookup to find if a variable with the same name has been declared.
-        2. If not, build a new VarSymbol, and put it into the current scope using ctx.declare.
-        3. Set the 'symbol' attribute of decl.
-        4. If there is an initial value, visit it.
-        """
         if ctx.top().lookup(decl.ident.value) == None:
             var = VarSymbol(decl.ident.value, decl.var_t.type)
             ctx.top().declare(var)
@@ -113,11 +113,6 @@ class Namer(Visitor[ScopeStack, None]):
     def visitBinary(self, expr: Binary, ctx: ScopeStack) -> None:
         expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
-
-    def visitCondExpr(self, expr: ConditionExpression, ctx: ScopeStack) -> None:
-        expr.cond.accept(self, ctx)
-        expr.then.accept(self, ctx)
-        expr.otherwise.accept(self, ctx)
 
     def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
         if ctx.lookup(ident.value) == None:
