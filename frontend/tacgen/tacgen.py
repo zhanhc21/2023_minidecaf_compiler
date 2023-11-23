@@ -244,7 +244,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         loopLabel = mv.freshLabel()
         breakLabel = mv.freshLabel()
         mv.openLoop(breakLabel, loopLabel)
-        # ini i
+
         stmt.init.accept(self, mv)
         
         mv.visitLabel(beginLabel)
