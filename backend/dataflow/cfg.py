@@ -13,7 +13,7 @@ class CFG:
     def __init__(self, nodes: list[BasicBlock], edges: list[(int, int)]) -> None:
         self.nodes = nodes
         self.edges = edges
-        self.reachable = []
+        self.reachable = set()
         self.links = []
 
         for i in range(len(nodes)):
@@ -31,7 +31,7 @@ class CFG:
         stack.append(0)
         while stack:
             top = stack.pop()
-            self.reachable.append(top)
+            self.reachable.add(top)
             for node in self.links[top][1]:
                 if node not in self.reachable:
                     stack.append(node)       
