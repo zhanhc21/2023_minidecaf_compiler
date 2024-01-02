@@ -1,9 +1,10 @@
 from enum import Enum, auto, unique
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 from utils.label.label import Label
 from utils.tac.nativeinstr import NativeInstr
 from utils.tac.reg import Reg
+from utils.tac.tacop import InstrKind
 
 from .tacop import *
 from .tacvisitor import TACVisitor
@@ -17,11 +18,13 @@ class TACInstr:
         dsts: list[Temp],
         srcs: list[Temp],
         label: Optional[Label],
+        isCall: bool = False
     ) -> None:
         self.kind = kind
         self.dsts = dsts.copy()
         self.srcs = srcs.copy()
         self.label = label
+        self.isCall = isCall
 
     def getRead(self) -> list[int]:
         return [src.index for src in self.srcs]
@@ -37,7 +40,7 @@ class TACInstr:
 
     def isReturn(self) -> bool:
         return self.kind == InstrKind.RET
-
+    
     def toNative(self, dstRegs: list[Reg], srcRegs: list[Reg]) -> NativeInstr:
         oldDsts = dstRegs
         oldSrcs = srcRegs
@@ -177,6 +180,22 @@ class Return(TACInstr):
 
     def accept(self, v: TACVisitor) -> None:
         v.visitReturn(self)
+
+
+# Call instruction.
+class Call(TACInstr):
+    def __init__(self, dst: Temp, params: List[Temp], target: Label) -> None:
+        super(Call, self).__init__(InstrKind.SEQ, [dst], params, target, True) # isCall = true
+
+    def __str__(self) -> str:
+        return "%s = CALL %s(%s)" % (
+            self.dsts[0], 
+            self.label.name,
+            ', '.join(str(src) for src in self.srcs)
+        )
+    
+    def accept(self, v: TACVisitor) -> None:
+        v.visitCall(self)
 
 
 # Annotation (used for debugging).

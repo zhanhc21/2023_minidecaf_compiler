@@ -1,8 +1,8 @@
-from frontend.ast.node import Optional
-from frontend.ast.tree import Function, Optional
+from frontend.ast.node import T, Optional
+from frontend.ast.tree import T, Call, Function, Optional, Parameter
 from frontend.ast import node
 from frontend.ast.tree import *
-from frontend.ast.visitor import Visitor
+from frontend.ast.visitor import T, Visitor
 from frontend.symbol.varsymbol import VarSymbol
 from frontend.type.array import ArrayType
 from utils.label.blocklabel import BlockLabel
@@ -48,19 +48,23 @@ class TACFuncEmitter(TACVisitor):
         self.continueLabelStack = []
         self.breakLabelStack = []
 
+
     # To get a fresh new temporary variable.
     def freshTemp(self) -> Temp:
         temp = Temp(self.nextTempId)
         self.nextTempId += 1
         return temp
 
+
     # To get a fresh new label (for jumping and branching, etc).
     def freshLabel(self) -> Label:
         return self.labelManager.freshLabel()
 
+
     # To count how many temporary variables have been used.
     def getUsedTemp(self) -> int:
         return self.nextTempId
+
 
     # In fact, the following methods can be named 'appendXXX' rather than 'visitXXX'.
     # E.g., by calling 'visitAssignment', you add an assignment instruction at the end of current function.
@@ -68,44 +72,56 @@ class TACFuncEmitter(TACVisitor):
         self.func.add(Assign(dst, src))
         return src
 
+
     def visitLoad(self, value: Union[int, str]) -> Temp:
         temp = self.freshTemp()
         self.func.add(LoadImm4(temp, value))
         return temp
+
 
     def visitUnary(self, op: UnaryOp, operand: Temp) -> Temp:
         temp = self.freshTemp()
         self.func.add(Unary(op, temp, operand))
         return temp
 
+
     def visitUnarySelf(self, op: UnaryOp, operand: Temp) -> None:
         self.func.add(Unary(op, operand, operand))
+
 
     def visitBinary(self, op: BinaryOp, lhs: Temp, rhs: Temp) -> Temp:
         temp = self.freshTemp()
         self.func.add(Binary(op, temp, lhs, rhs))
         return temp
 
+
     def visitBinarySelf(self, op: BinaryOp, lhs: Temp, rhs: Temp) -> None:
         self.func.add(Binary(op, lhs, lhs, rhs))
+
 
     def visitBranch(self, target: Label) -> None:
         self.func.add(Branch(target))
 
+
     def visitCondBranch(self, op: CondBranchOp, cond: Temp, target: Label) -> None:
         self.func.add(CondBranch(op, cond, target))
+
 
     def visitReturn(self, value: Optional[Temp]) -> None:
         self.func.add(Return(value))
 
+
     def visitLabel(self, label: Label) -> None:
         self.func.add(Mark(label))
+
 
     def visitMemo(self, content: str) -> None:
         self.func.add(Memo(content))
 
+
     def visitRaw(self, instr: TACInstr) -> None:
         self.func.add(instr)
+
 
     def visitEnd(self) -> TACFunc:
         if (len(self.func.instrSeq) == 0) or (not self.func.instrSeq[-1].isReturn()):
@@ -113,19 +129,27 @@ class TACFuncEmitter(TACVisitor):
         self.func.tempUsed = self.getUsedTemp()
         return self.func
 
+
+    def visitCall(self, dst: Temp, params: List[Temp], target: Label) -> None:
+        self.func.add(Call(dst, params, target))
+
+
     # To open a new loop (for break/continue statements)
     def openLoop(self, breakLabel: Label, continueLabel: Label) -> None:
         self.breakLabelStack.append(breakLabel)
         self.continueLabelStack.append(continueLabel)
+
 
     # To close the current loop.
     def closeLoop(self) -> None:
         self.breakLabelStack.pop()
         self.continueLabelStack.pop()
 
+
     # To get the label for 'break' in the current loop.
     def getBreakLabel(self) -> Label:
         return self.breakLabelStack[-1]
+
 
     # To get the label for 'continue' in the current loop.
     def getContinueLabel(self) -> Label:
@@ -134,49 +158,56 @@ class TACFuncEmitter(TACVisitor):
 
 class TACGen(Visitor[TACFuncEmitter, None]):
     # Entry of this phase
-
     def transform(self, program: Program) -> TACProg:
         labelManager = LabelManager()
         tacFuncs = []
         for funcName, astFunc in program.functions().items():
             # in step9, you need to use real parameter count
-            emitter = TACFuncEmitter(FuncLabel(funcName), 0, labelManager)
-            astFunc.body.accept(self, emitter)
+            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params), labelManager)
+            astFunc.accept(self, emitter)
             tacFuncs.append(emitter.visitEnd())
         return TACProg(tacFuncs)
+
 
     def visitBlock(self, block: Block, mv: TACFuncEmitter) -> None:
         for child in block:
             child.accept(self, mv)
 
+
     def visitReturn(self, stmt: Return, mv: TACFuncEmitter) -> None:
         stmt.expr.accept(self, mv)
-        mv.visitReturn(stmt.expr.getattr("val"))
+        mv.visitReturn(stmt.expr.getattr('val'))
+
 
     def visitBreak(self, stmt: Break, mv: TACFuncEmitter) -> None:
         mv.visitBranch(mv.getBreakLabel())
 
+
     def visitContinue(self, stmt: Continue, mv: TACFuncEmitter) -> None:
         mv.visitBranch(mv.getContinueLabel())
 
+
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
-        var = decl.getattr("symbol")
+        var = decl.getattr('symbol')
         var.temp = mv.freshTemp()
         if decl.init_expr != NULL:
             decl.init_expr.accept(self, mv)
-            mv.visitAssignment(var.temp, decl.init_expr.getattr("val"))
+            mv.visitAssignment(var.temp, decl.init_expr.getattr('val'))
+
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
         expr.rhs.accept(self, mv)
-        r_temp = expr.rhs.getattr("val")
-        l_temp = expr.lhs.getattr("symbol").temp
+        r_temp = expr.rhs.getattr('val')
+        l_temp = expr.lhs.getattr('symbol').temp
         mv.visitAssignment(l_temp, r_temp)
-        expr.setattr("val", r_temp)
+        expr.setattr('val', r_temp)
         
+
     def visitIdentifier(self, ident: Identifier, mv: TACFuncEmitter) -> None:
-        var = ident.getattr("symbol")
-        ident.setattr("val", var.temp)
+        # print("ident: ", ident.getattr('symbol'))
+        ident.setattr('val', ident.getattr('symbol').temp)
     
+
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)
 
@@ -199,6 +230,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             mv.visitLabel(skipLabel)
             stmt.otherwise.accept(self, mv)
             mv.visitLabel(exitLabel)
+
 
     def visitCondExpr(self, expr: ConditionExpression, mv: TACFuncEmitter) -> None:
         expr.cond.accept(self, mv)
@@ -223,6 +255,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
         expr.setattr("val", temp)
 
+
     def visitWhile(self, stmt: While, mv: TACFuncEmitter) -> None:
         beginLabel = mv.freshLabel()
         loopLabel = mv.freshLabel()
@@ -238,6 +271,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         mv.visitBranch(beginLabel)
         mv.visitLabel(breakLabel)
         mv.closeLoop()
+
 
     def visitFor(self, stmt: For, mv: TACFuncEmitter) -> None:
         beginLabel = mv.freshLabel()
@@ -259,6 +293,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         mv.visitLabel(breakLabel)
         mv.closeLoop()
 
+
     def visitUnary(self, expr: Unary, mv: TACFuncEmitter) -> None:
         expr.operand.accept(self, mv)
         
@@ -269,7 +304,9 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         }[expr.op]
         expr.setattr("val", mv.visitUnary(op, expr.operand.getattr("val")))
 
+
     def visitBinary(self, expr: Binary, mv: TACFuncEmitter) -> None:
+        # print("binary: ", expr.lhs , expr.rhs)
         expr.lhs.accept(self, mv)
         expr.rhs.accept(self, mv)
 
@@ -297,5 +334,31 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             "val", mv.visitBinary(op, expr.lhs.getattr("val"), expr.rhs.getattr("val"))
         )
 
+
     def visitIntLiteral(self, expr: IntLiteral, mv: TACFuncEmitter) -> None:
         expr.setattr("val", mv.visitLoad(expr.value))
+
+
+    def visitFunction(self, func: Function, mv: TACFuncEmitter) -> None:
+        for parameter in func.params:
+            parameter.accept(self, mv)
+        func.body.accept(self, mv)
+
+
+    def visitCall(self, call: Call, mv: TACFuncEmitter) -> None:
+        params = []
+        for argument in call.argument_list:
+            argument.accept(self, mv)
+            assert argument.getattr('val')
+            params += [argument.getattr('val')]
+            
+        dst = mv.freshTemp()
+        call.setattr('val', dst)
+        target = FuncLabel(call.ident.value)
+        mv.visitCall(dst, params, target)
+
+
+    def visitParameter(self, param: Parameter, mv: TACFuncEmitter) -> None:
+        var = param.getattr("symbol")
+        var.temp = mv.freshTemp()
+        mv.func.addTemp(var.temp)

@@ -6,7 +6,7 @@ Modify this file if you want to add a new AST node.
 
 from __future__ import annotations
 
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union, List
 
 from frontend.type import INT, DecafType
 from utils import T, U
@@ -53,6 +53,10 @@ class Program(ListNode["Function"]):
     def __init__(self, *children: Function) -> None:
         super().__init__("program", list(children))
 
+    def addFunc(self, Func: Function) -> Program:
+        self.children.append(Func)
+        return self
+
     def functions(self) -> dict[str, Function]:
         return {func.ident.value: func for func in self if isinstance(func, Function)}
 
@@ -64,7 +68,7 @@ class Program(ListNode["Function"]):
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitProgram(self, ctx)
-
+    
 
 class Function(Node):
     """
@@ -73,28 +77,31 @@ class Function(Node):
 
     def __init__(
         self,
-        ret_t: TypeLiteral,
-        ident: Identifier,
-        body: Block,
+        ret_t:  TypeLiteral,
+        ident:  Identifier,
+        params: List[Parameter],
+        body:   Block,
     ) -> None:
         super().__init__("function")
         self.ret_t = ret_t
         self.ident = ident
+        self.params = params
         self.body = body
 
     def __getitem__(self, key: int) -> Node:
         return (
             self.ret_t,
             self.ident,
+            *self.params,
             self.body,
         )[key]
 
     def __len__(self) -> int:
-        return 3
+        return 3 + len(self.params)
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitFunction(self, ctx)
-
+    
 
 class Statement(Node):
     """
@@ -283,6 +290,30 @@ class Expression(Node):
         self.type: Optional[DecafType] = None
 
 
+class Call(Expression):
+    """
+    AST node that represents a call.
+    """
+
+    def __init__(
+        self,
+        ident: Identifier,
+        argument_list: List[Expression]
+    ) -> None:
+        super().__init__("call")
+        self.ident = ident
+        self.argument_list = argument_list
+
+    def __getitem__(self, key: int) -> Node:
+        return (self.ident, *self.argument_list)[key]
+
+    def __len__(self) -> int:
+        return 1 + len(self.argument_list)
+
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitCall(self, ctx)
+    
+
 class Unary(Expression):
     """
     AST node of unary expression.
@@ -464,3 +495,26 @@ class TInt(TypeLiteral):
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitTInt(self, ctx)
+
+
+class Parameter(Declaration):
+    """
+    AST node that represents a parameter.
+    """
+    def __init__(
+        self,
+        var_t: TypeLiteral,
+        ident: Identifier,
+    ) -> None:
+        super().__init__(var_t, ident)
+        self.var_t = var_t
+        self.ident = ident
+
+    def __getitem__(self, key: int) -> Node:
+        return (self.var_t, self.ident)[key]
+
+    def __len__(self) -> int:
+        return 2
+
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitParameter(self, ctx)

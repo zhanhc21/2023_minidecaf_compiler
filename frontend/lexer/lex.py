@@ -23,6 +23,7 @@ reserved = {
 }
 
 t_Semi = ";"
+t_Comma = ","
 
 t_LParen = "("
 t_RParen = ")"

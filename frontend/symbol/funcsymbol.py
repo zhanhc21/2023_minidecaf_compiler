@@ -14,6 +14,7 @@ class FuncSymbol(Symbol):
         super().__init__(name, type)
         self.scope = scope
         self.para_type = []
+        self.isDefined = False
 
     def __str__(self) -> str:
         return "function %s : %s" % (self.name, str(self.type))
@@ -34,3 +35,6 @@ class FuncSymbol(Symbol):
     # To get the parameters' type.
     def getParaType(self, id: int) -> DecafType:
         return self.para_type[id]
+    
+    def define(self) -> None:
+        self.isDefined = True

@@ -1,10 +1,10 @@
-from typing import Final, Optional
+from typing import Final, List, Optional
 
 from utils.label.funclabel import FuncLabel
 from utils.label.label import Label, LabelKind
 from utils.tac.nativeinstr import NativeInstr
 from utils.tac.reg import Reg
-from utils.tac.tacinstr import TACInstr
+from utils.tac.tacinstr import Call, TACInstr
 from utils.tac.tacop import InstrKind
 from utils.tac.temp import Temp
 
@@ -37,8 +37,8 @@ class RvBinaryOp(Enum):
 class Riscv:
 
     ZERO = Reg(0, "x0")  # always zero
-    RA = Reg(1, "ra")  # return address
-    SP = Reg(2, "sp")  # stack pointer
+    RA = Reg(1, "ra")  # return address   caller
+    SP = Reg(2, "sp")  # stack pointer    callee
     GP = Reg(3, "gp")  # global pointer
     TP = Reg(4, "tp")  # thread pointer
     T0 = Reg(5, "t0")
@@ -97,6 +97,7 @@ class Riscv:
         def __str__(self) -> str:
             return "j " + str(self.label)
 
+
     class RiscvLabel(TACInstr):
         def __init__(self, label: Label) -> None:
             super().__init__(InstrKind.LABEL, [], [], label)
@@ -107,6 +108,7 @@ class Riscv:
         def isLabel(self) -> bool:
             return True
 
+
     class LoadImm(TACInstr):
         def __init__(self, dst: Temp, value: int) -> None:
             super().__init__(InstrKind.SEQ, [dst], [], None)
@@ -115,12 +117,14 @@ class Riscv:
         def __str__(self) -> str:
             return "li " + Riscv.FMT2.format(str(self.dsts[0]), self.value)
 
+
     class Move(TACInstr):
         def __init__(self, dst: Temp, src: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src], None)
 
         def __str__(self) -> str:
             return "mv " + Riscv.FMT2.format(str(self.dsts[0]), str(self.srcs[0]))
+
 
     class Unary(TACInstr):
         def __init__(self, op: RvUnaryOp, dst: Temp, src: Temp) -> None:
@@ -132,6 +136,7 @@ class Riscv:
                 str(self.dsts[0]), str(self.srcs[0])
             )
 
+
     class Binary(TACInstr):
         def __init__(self, op: RvBinaryOp, dst: Temp, src0: Temp, src1: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src0, src1], None)
@@ -142,6 +147,7 @@ class Riscv:
                 str(self.dsts[0]), str(self.srcs[0]), str(self.srcs[1])
             )
     
+
     class Branch(TACInstr):
         def __init__(self, cond: Temp, target: Label) -> None:
             super().__init__(InstrKind.COND_JMP, [], [cond], target)
@@ -150,6 +156,7 @@ class Riscv:
         def __str__(self) -> str:
             return "beq " + Riscv.FMT3.format(str(Riscv.ZERO), str(self.srcs[0]), str(self.target))
 
+
     class Jump(TACInstr):
         def __init__(self, target: Label) -> None:
             super().__init__(InstrKind.JMP, [], [], target)
@@ -157,6 +164,19 @@ class Riscv:
         
         def __str__(self) -> str:
             return "j " + str(self.target)
+
+
+    class Call(TACInstr):
+        @classmethod
+        def construct(cls, call: Call) -> Call:
+            return cls(call.dsts[0], call.srcs, call.label)
+
+        def __init__(self, dst: Temp, params: List[Temp], target: Label) -> None:
+            super().__init__(InstrKind.SEQ, [dst], params, target, True)
+
+        def __str__(self) -> str:
+            return "call " + str(self.label.name)
+
 
     class SPAdd(NativeInstr):
         def __init__(self, offset: int) -> None:
@@ -169,6 +189,7 @@ class Riscv:
                 str(Riscv.SP), str(Riscv.SP), str(self.offset)
             )
 
+
     class NativeStoreWord(NativeInstr):
         def __init__(self, src: Reg, base: Reg, offset: int) -> None:
             super().__init__(InstrKind.SEQ, [], [src, base], None)
@@ -180,6 +201,7 @@ class Riscv:
                 str(self.srcs[0]), str(self.offset), str(self.srcs[1])
             )
 
+
     class NativeLoadWord(NativeInstr):
         def __init__(self, dst: Reg, base: Reg, offset: int) -> None:
             super().__init__(InstrKind.SEQ, [dst], [base], None)
@@ -190,6 +212,7 @@ class Riscv:
             return "lw " + Riscv.FMT_OFFSET.format(
                 str(self.dsts[0]), str(self.offset), str(self.srcs[0])
             )
+
 
     class NativeReturn(NativeInstr):
         def __init__(self) -> None:

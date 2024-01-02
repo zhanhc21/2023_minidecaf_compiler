@@ -36,20 +36,26 @@ class CFG:
                 if node not in self.reachable:
                     stack.append(node)       
     
+
     def getBlock(self, id):
         return self.nodes[id]
+
 
     def getPrev(self, id):
         return self.links[id][0]
 
+
     def getSucc(self, id):
         return self.links[id][1]
+
 
     def getInDegree(self, id):
         return len(self.links[id][0])
 
+
     def getOutDegree(self, id):
         return len(self.links[id][1])
+
 
     def iterator(self):
         reachableNodes = []

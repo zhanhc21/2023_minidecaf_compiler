@@ -8,7 +8,9 @@ from backend.riscv.riscvasmemitter import RiscvAsmEmitter
 from backend.subroutineemitter import SubroutineEmitter
 from backend.subroutineinfo import SubroutineInfo
 from utils.riscv import Riscv
+from utils.tac.nativeinstr import NativeInstr
 from utils.tac.reg import Reg
+from utils.tac.tacop import InstrKind
 from utils.tac.temp import Temp
 
 """
@@ -34,15 +36,24 @@ class BruteRegAlloc(RegAlloc):
         for reg in emitter.allocatableRegs:
             reg.used = False
 
+
     def accept(self, graph: CFG, info: SubroutineInfo) -> None:
         subEmitter = self.emitter.emitSubroutine(info)
+
+        for temp, argReg in zip(subEmitter.info.temps, Riscv.ArgRegs):
+            self.bind(temp, argReg)
+        if len(graph.reachable) > 0:
+            for tempIndex in graph.nodes[0].liveIn:
+                if tempIndex in self.bindings:
+                    subEmitter.emitStoreToStack(self.bindings.get(tempIndex))
+        subEmitter.printer.printComment("store1 " + str(subEmitter.offsets))
+
         for bb in graph.iterator():
-            # you need to think more here
-            # maybe we don't need to alloc regs for all the basic blocks
             if bb.label is not None:
                 subEmitter.emitLabel(bb.label)
             self.localAlloc(bb, subEmitter)
         subEmitter.emitEnd()
+
 
     def bind(self, temp: Temp, reg: Reg):
         reg.used = True
@@ -50,10 +61,12 @@ class BruteRegAlloc(RegAlloc):
         reg.occupied = True
         reg.temp = temp
 
+
     def unbind(self, temp: Temp):
         if temp.index in self.bindings:
             self.bindings[temp.index].occupied = False
             self.bindings.pop(temp.index)
+
 
     def localAlloc(self, bb: BasicBlock, subEmitter: SubroutineEmitter):
         self.bindings.clear()
@@ -62,16 +75,60 @@ class BruteRegAlloc(RegAlloc):
 
         # in step9, you may need to think about how to store callersave regs here
         for loc in bb.allSeq():
-            subEmitter.emitComment(str(loc.instr))
-
-            self.allocForLoc(loc, subEmitter)
-
-        for tempindex in bb.liveOut:
-            if tempindex in self.bindings:
-                subEmitter.emitStoreToStack(self.bindings.get(tempindex))
-
+            if loc.instr.isCall:
+                # Call
+                self.allocForCall(loc, bb.liveIn, subEmitter)
+            else:
+                subEmitter.emitComment(str(loc.instr))
+                self.allocForLoc(loc, subEmitter)
+            # bb.liveOut不更新???
+            for tempindex in loc.liveOut:
+                if tempindex in self.bindings:
+                    subEmitter.emitStoreToStack(self.bindings.get(tempindex))
+           
+            subEmitter.emitComment("store3 "+ str(subEmitter.offsets))
         if (not bb.isEmpty()) and (bb.kind is not BlockKind.CONTINUOUS):
             self.allocForLoc(bb.locs[len(bb.locs) - 1], subEmitter)
+
+
+    def allocForCall(self, loc: Loc, liveIn: set[int], subEmitter: SubroutineEmitter):
+        # 保存活跃临时变量
+        for i in range(len(Riscv.CallerSaved)):
+            temp = Riscv.CallerSaved[i].temp
+            if temp != None:
+                if temp.index in liveIn:
+                    subEmitter.emitComment(
+                        "store {} to {}".format(
+                            str(temp), str(self.bindings.get(temp.index))
+                        )
+                    )
+                    if self.bindings.get(temp.index) is not None:
+                        subEmitter.emitStoreToStack(self.bindings.get(temp.index))
+                self.unbind(temp)
+
+        # 参数/寄存器绑定
+        call = loc.instr
+        for temp, argReg in zip(call.srcs, Riscv.ArgRegs):
+            subEmitter.emitComment(
+                "CALL allocate {} to {}".format(
+                    str(temp), str(argReg)
+                )
+            )
+            if temp.index in self.bindings:
+                self.unbind(temp)
+            subEmitter.printer.printComment("load " + str(subEmitter.offsets))
+            subEmitter.emitLoadFromStack(argReg, temp)
+            self.bind(temp, argReg)
+
+        # 函数调用
+        subEmitter.emitComment(str(call))
+        subEmitter.emitNative(NativeInstr(InstrKind.SEQ, call.dsts, call.dsts, call.label, call.__str__()))
+
+        # 处理函数返回值, target绑定a0
+        self.bind(call.dsts[0], Riscv.A0)
+        subEmitter.emitStoreToStack(Riscv.A0)
+        subEmitter.printer.printComment("store2 " + str(subEmitter.offsets))
+
 
     def allocForLoc(self, loc: Loc, subEmitter: SubroutineEmitter):
         instr = loc.instr
@@ -94,6 +151,7 @@ class BruteRegAlloc(RegAlloc):
 
         subEmitter.emitNative(instr.toNative(dstRegs, srcRegs))
 
+
     def allocRegFor(
         self, temp: Temp, isRead: bool, live: set[int], subEmitter: SubroutineEmitter
     ):
@@ -103,7 +161,7 @@ class BruteRegAlloc(RegAlloc):
         for reg in self.emitter.allocatableRegs:
             if (not reg.occupied) or (not reg.temp.index in live):
                 subEmitter.emitComment(
-                    "  allocate {} to {}  (read: {}):".format(
+                    "allocate {} to {}  (read: {}):".format(
                         str(temp), str(reg), str(isRead)
                     )
                 )
@@ -118,6 +176,7 @@ class BruteRegAlloc(RegAlloc):
             random.randint(0, len(self.emitter.allocatableRegs) - 1)
         ]
         subEmitter.emitStoreToStack(reg)
+        subEmitter.printer.printComment("store4 " + str(subEmitter.offsets))
         subEmitter.emitComment("  spill {} ({})".format(str(reg), str(reg.temp)))
         self.unbind(reg.temp)
         self.bind(temp, reg)

@@ -1,12 +1,14 @@
 from typing import Optional
 
 from frontend.symbol.symbol import Symbol
+from frontend.symbol.funcsymbol import FuncSymbol
 
 from .scope import Scope
 
 class ScopeStack:
-    def __init__(self) -> None:
-        self.scopes = []
+    def __init__(self, globalScope: Scope) -> None:
+        self.scopes = [globalScope]
+        self.globalScope = globalScope
         self.loopNum = 0
 
     def push(self, scope: Scope) -> None:
@@ -24,10 +26,10 @@ class ScopeStack:
                 return scope.get(name)
         return None
 
-    def openloop(self) -> None:
+    def openLoop(self) -> None:
         self.loopNum += 1
     
-    def closeloop(self) -> None:
+    def closeLoop(self) -> None:
         self.loopNum -= 1
 
     def checkLoop(self) -> int:
